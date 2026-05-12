@@ -46,8 +46,8 @@ jobs:
       # TO JEST KLUCZOWE: Tworzenie pliku .pem w locie na serwerze GitHuba
       - name: Create Private Key File
         run: |
-          echo "${{ secrets.OCI_PRIVATE_KEY_CONTENT }}" > ./oci_private_key.pem
-          chmod 600 ./oci_private_key.pem
+             echo "${{ secrets.OCI_PRIVATE_KEY_CONTENT }}" | base64 -d > ./oci_private_key.pem
+             chmod 600 ./oci_private_key.pem
 
       - name: Run script
         run: php index.php
