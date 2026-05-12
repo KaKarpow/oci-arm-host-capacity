@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - main
-
   schedule:
     - cron: '*/5 * * * *'
 
@@ -19,37 +18,48 @@ jobs:
         php-versions: ['7.4']
     name: integration-tests (PHP ${{ matrix.php-versions }})
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      
       - name: Install PHP
-        uses: shivammathur/setup-php@v3
+        uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-versions }}
+          
       - name: Validate composer.json and composer.lock
         run: composer validate
 
+      # Naprawione przestarzałe set-output
       - name: Get Composer Cache Directory
         id: composer-cache
-        run: |
-          echo "::set-output name=dir::$(composer config cache-files-dir)"
-      - uses: actions/cache@v3
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+        
+      - uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-${{ matrix.php-version }}-composer-${{ matrix.dependencies }}-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php${{ matrix.php-versions }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.php-version }}-composer-${{ matrix.dependencies }}-
+            ${{ runner.os }}-php${{ matrix.php-versions }}-composer-
 
       - name: Install dependencies
+        run: composer update --prefer-dist --no-progress
+
+      # TO JEST KLUCZOWE: Tworzenie pliku .pem w locie na serwerze GitHuba
+      - name: Create Private Key File
         run: |
-          composer update --prefer-dist --no-progress
+          echo "${{ secrets.OCI_PRIVATE_KEY_CONTENT }}" > ./oci_private_key.pem
+          chmod 600 ./oci_private_key.pem
+
       - name: Run script
-        run: |
-          php index.php
+        run: php index.php
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
-          OCI_PRIVATE_KEY_FILENAME: ${{ secrets.OCI_PRIVATE_KEY_FILENAME }}
+          
+          # Podajemy ścieżkę do pliku, który przed chwilą stworzyliśmy
+          OCI_PRIVATE_KEY_FILENAME: ./oci_private_key.pem 
+          
           OCI_AVAILABILITY_DOMAIN: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
@@ -63,4 +73,3 @@ jobs:
           AD_ALWAYS_FREE: ${{ secrets.AD_ALWAYS_FREE }}
           TEST_IMAGE_ID: ${{ secrets.TEST_IMAGE_ID }}
           TEST_SUBNET_ID: ${{ secrets.TEST_SUBNET_ID }}
-
